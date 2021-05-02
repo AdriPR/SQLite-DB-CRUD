@@ -1,4 +1,5 @@
 import sqlite3
+import re
 from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
@@ -38,16 +39,13 @@ def getTable(t):
 	#Query to get table information
 	cursor.execute("PRAGMA table_info('" + t + "');")
 	importedColumns = cursor.fetchall()
-	print(importedColumns)
 
 	pk = getPrimaryKey(importedColumns)
-	print(pk)
 	#Save table information
 	for c in importedColumns:
 		columns.append(c[1])
 		columnsType.append(c[2])
 	
-	print(columns)
 	i = 0
 	#Print table info
 	for k in columns:
@@ -86,7 +84,7 @@ def newDB():
 	cursor = connection.cursor()
 	init()
 	
-#Initialize all frames
+#Initialize GUI
 def init ():
 	global frameTables
 	global frameExecute
@@ -117,11 +115,51 @@ def init ():
 	refreshTables(cursor)
 
 def executeQuery(query):
-	print(query)
 	global actualTable
+	#Get actual from query
+	for t in tables:
+		if t in query:
+			getTable(t)
+	#Clear actualTable variable in case a "DROP TABLE" query is executed while that table is "open"
 	if ("drop table " + actualTable).lower() in query.lower():
 		actualTable = " "
-	cursor.execute(query)
+	#In case is a "SELECT" query
+	elif "select " in query[0:7].lower():
+		selectColumns = []
+
+		if "*" in query:
+			selectColumns = columns
+
+		else:
+			m = re.search('select(.*) from ', query.lower())
+			subString = m.group(0)
+			for c in columns:
+				if c.lower() in subString:
+					selectColumns.append(c)
+
+		cursor.execute(query)
+		result = cursor.fetchall()
+		width = len(selectColumns)
+		#Print result on a new window
+		if len(result)==0:
+			#Print table content
+			for c in selectColumns:
+				result.append("")
+			results = []
+			results.append(tuple(result))
+			df = pd.DataFrame(results, columns = selectColumns)
+			pt = Table(frameResults, dataframe = df, width = 500, height = 500, cols = width)
+			pt.grid(row = 0, column = 0, sticky = "nsew")
+			pt.show()
+		else:
+			height = len(result)
+			#Print table content
+			df = pd.DataFrame(result, columns = selectColumns)
+			pt = Table(frameResults, dataframe = df, width = 500, height = 500, cols = width, rows = height)
+			pt.grid(row = 0, column = 0, sticky = "nsew")
+			pt.show()
+	else:
+		cursor.execute(query)
 	connection.commit()
 
 #Query to print all data of a table
@@ -132,27 +170,7 @@ def readAll():
 		messagebox.showinfo(title = "Warning", message = "Please, select a table.")
 	else:
 		executeQuery("SELECT * FROM " + actualTable)
-		result = cursor.fetchall()
-		#Print result on a new window
-		if len(result)==0:
-			width = len(columns[0])
-			#Print table content
-			for c in columns:
-				result.append("")
-			results = []
-			results.append(tuple(result))
-			df = pd.DataFrame(results, columns = columns)
-			pt = Table(frameResults, dataframe = df, width = 500, height = 500, cols = width)
-			pt.grid(row = 0, column = 0, sticky = "nsew")
-			pt.show()
-		else:
-			height = len(result)
-			width = len(columns[0])
-			#Print table content
-			df = pd.DataFrame(result, columns = columns)
-			pt = Table(frameResults, dataframe = df, width = 500, height = 500, cols = width, rows = height)
-			pt.grid(row = 0, column = 0, sticky = "nsew")
-			pt.show()
+		
 
 def refreshTables(cursor):
 	for widgets in frameTables.winfo_children():
