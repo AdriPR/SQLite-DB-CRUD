@@ -32,7 +32,7 @@ def getTable(t):
 	#Clear lists to avoid wrong mapping
 	columns.clear()
 	columnsType.clear()
-
+	refreshTables()
 	global actualTable
 
 	actualTable = t
@@ -110,15 +110,16 @@ def init ():
 	execute.grid(row = 0, column = 0)
 	read = Button(frameButtons, text = "Read All", command = lambda: readAll())
 	read.grid(row = 1, column = 0)
-	refresh = Button(frameButtons, text = "Refresh Tables", command = lambda: refreshTables(cursor))
+	refresh = Button(frameButtons, text = "Refresh Tables", command = lambda: refreshTables())
 	refresh.grid(row = 2, column = 0, sticky = "w")
-	refreshTables(cursor)
+	refreshTables()
 
 def executeQuery(query):
 	global actualTable
 	#Get actual from query
 	for t in tables:
 		if t in query:
+			cursor.execute(query)
 			getTable(t)
 	#Clear actualTable variable in case a "DROP TABLE" query is executed while that table is "open"
 	if ("drop table " + actualTable).lower() in query.lower():
@@ -139,25 +140,18 @@ def executeQuery(query):
 
 		cursor.execute(query)
 		result = cursor.fetchall()
-		width = len(selectColumns)
 		#Print result on a new window
 		if len(result)==0:
-			#Print table content
-			for c in selectColumns:
-				result.append("")
-			results = []
-			results.append(tuple(result))
-			df = pd.DataFrame(results, columns = selectColumns)
-			pt = Table(frameResults, dataframe = df, width = 500, height = 500, cols = width)
-			pt.grid(row = 0, column = 0, sticky = "nsew")
-			pt.show()
+			messagebox.showinfo(title = "Result", message = "No result found.")
 		else:
+			width = len(selectColumns)
 			height = len(result)
 			#Print table content
 			df = pd.DataFrame(result, columns = selectColumns)
 			pt = Table(frameResults, dataframe = df, width = 500, height = 500, cols = width, rows = height)
 			pt.grid(row = 0, column = 0, sticky = "nsew")
 			pt.show()
+			
 	else:
 		cursor.execute(query)
 	connection.commit()
@@ -172,7 +166,8 @@ def readAll():
 		executeQuery("SELECT * FROM " + actualTable)
 		
 
-def refreshTables(cursor):
+def refreshTables():
+	tables.clear()
 	for widgets in frameTables.winfo_children():
 		widgets.destroy()
 	for widgets in frameResults.winfo_children():
